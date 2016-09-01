@@ -5,21 +5,19 @@ import time
 from decimal import Decimal
 
 
-SEGMENTS_IN_PLAYLIST = 10
+SEGMENTS_IN_PLAYLIST = 3
 
 from flask import Flask, Response
 app = Flask(__name__)
 
-def read_file_durations():
-    with open("static/bipbop_4x3/gear1/prog_index.m3u8") as f:
+zero = time.time()
+
+def read_file_durations(playlist_id):
+    with open("static/bipbop_4x3/gear{}/prog_index.m3u8".format(playlist_id)) as f:
         content = f.read()
     file_durations = re.findall(r"EXTINF:([\d\.]+),\s*\n([\w\.]+)", content, flags=re.M)
     return [(float(duration), filename) for duration, filename in file_durations]
 
-files_and_durations = read_file_durations()
-total_duration = sum(duration for duration, filename in files_and_durations)
-n_segments = len(files_and_durations)
-zero = time.time()
 
 @app.route("/variant.m3u8")
 def variant():
@@ -34,8 +32,13 @@ playlist3.m3u8
 playlist4.m3u8
 """, mimetype="application/vnd.apple.mpegurl")
 
-@app.route("/playlist<int:id>.m3u8")
-def playlist(id):
+@app.route("/radio.m3u8")
+@app.route("/playlist<int:playlist_id>.m3u8")
+def playlist(playlist_id=0):
+    files_and_durations = read_file_durations(playlist_id)
+    total_duration = sum(duration for duration, filename in files_and_durations)
+    n_segments = len(files_and_durations)
+
     now = time.time()
     delta = now - zero
     n_loops = math.floor(delta / total_duration)
@@ -55,7 +58,7 @@ def playlist(id):
 
     def format(segment):
         duration, filename = segment
-        return "#EXTINF:{duration},\n/static/bipbop_4x3/gear{id}/{filename}".format(duration=duration, id=id, filename=filename)
+        return "#EXTINF:{duration},\nstatic/bipbop_4x3/gear{pl_id}/{filename}".format(duration=duration, pl_id=playlist_id, filename=filename)
 
     segments_txt = '\n'.join([format(segment) for segment in segments])
 
